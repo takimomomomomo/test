@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html>
+
+    <head>
+    <title>custom</title>
+    <meta charset="utf-8" />
+    <script src="https://aframe.io/releases/1.7.0/aframe.min.js"></script>
+         <script src="https://cdn.jsdelivr.net/gh/c-frame/aframe-extras@7.5.0/dist/aframe-extras.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/c-frame/aframe-physics-system@v4.2.2/dist/aframe-physics-system.min.js"></script>
+<script>
+  AFRAME.registerComponent('camera-move-control', {
+    init: function () {
+      this.velocity = new THREE.Vector3();
+      this.speed = 0.1;
+      this.blocked = false;
+      this.rig = this.el;
+         this.rig.addEventListener('collidestart', (e) => {
+  console.log("衝突した相手:", e.detail.body.el);
+  this.blocked = true;
+         });
+      // 衝突イベント
+      this.rig.addEventListener('collidestart', () => {
+        this.blocked = true;
+      });
+
+      this.rig.addEventListener('collideend', () => {
+        this.blocked = false;
+      });
+
+      // キー入力
+      window.addEventListener('keydown', (e) => {
+        if (this.blocked) return;
+
+        switch (e.key) {
+          case 'w': this.velocity.z = -this.speed; break;
+          case 's': this.velocity.z = this.speed; break;
+          case 'a': this.velocity.x = -this.speed; break;
+          case 'd': this.velocity.x = this.speed; break;
+        }
+      });
+
+      window.addEventListener('keyup', () => {
+        this.velocity.set(0, 0, 0);
+      });
+    },
+
+    tick: function () {
+      this.rig.object3D.position.add(this.velocity);
+    }
+    
+  });
+</script>
+
+  
+
+    </head>
+
+    <body>
+    
+     <a-scene physics="debug: true">
+                 
+        <a-assets>
+                <!--3Dモデルの定義（Blenderなどで作成-->
+               
+                <a-asset-item id="box" src="box.glb"></a-asset-item>
+                <a-asset-item id="kumanomi" src="クマノミnew.glb" ></a-asset-item>
+                <a-asset-item id="suisou" src="only_suisou.glb" ></a-asset-item>
+                <a-asset-item id="syati" src="syachi.glb" ></a-asset-item>
+                <a-asset-item id="ei" src="サメ.glb" ></a-asset-item>
+                <a-asset-item id="enzel" src="エンジェルフィッシュ.glb" ></a-asset-item>
+                <a-asset-item id ="kurage" src="クラゲ.glb"></a-asset-item>
+                <a-asset-item id ="iwa" src="iwa4.glb"></a-asset-item>
+                <a-asset-item id ="kaisou" src="kaisou.glb"></a-asset-item>
+            </a-assets>
+
+
+        <a-entity id="cameraRig" position="0 1.6 0" dynamic-body="shape: sphere; mass: 1" camera-move-control>
+            <a-camera look-controls wasd-controls-enabled="false"></a-camera>
+</a-entity>
+
+
+
+
+
+            <a-entity id="world">
+           <a-entity
+                gltf-model="#box" position="0 -1 0" shadow="receive:true"  static-body 
+           ></a-entity>
+          
+
+           </a-entity>
+           <a-entity gltf-model="#suisou" position="-30 -1 0"rotation="0 0 0" shadow="receive:true" scale="5 20 15" static-body >
+
+           </a-entity>
+
+           <a-entity gltf-model="#ei" position="20 10 4"rotation="0 0 0" scale="0.5 0.5 0.5" animation-mixer shadow="receive:true">
+
+           </a-entity>
+           
+           <a-entity gltf-model="#kurage" position="40 5 7"shadow="receive:true">
+
+           </a-entity>
+          <a-entity
+                gltf-model="#syati" position="0 10 0" rotation="0 90 0" shadow="receive:true" animation-mixer scale="5 5 5"
+           ></a-entity>
+           
+           <a-entity
+            gltf-model="#kumanomi" position="0 10 0" shadow="receive:true" animation-mixer                 
+            
+           ></a-entity>
+           <a-entity
+           gltf-model="#iwa" position="40 10 0" shadow="receive:true" 
+           ></a-entity>
+           <a-entity 
+           gltf-model="#kaisou" position="0 0 0" shadow="receive:true" animation-mixer
+           ></a-entity>
+           </a-entity>
+           <a-sky color="#003388">
+           </a-sky>
+        </a-scene>
+    </body>
+</html>
