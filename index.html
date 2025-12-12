@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html>
+
+    <head>
+    <title>custom</title>
+    <meta charset="utf-8" />
+    <script src="https://aframe.io/releases/1.7.0/aframe.min.js"></script>
+         <script src="https://cdn.jsdelivr.net/gh/c-frame/aframe-extras@7.5.0/dist/aframe-extras.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/c-frame/aframe-physics-system@v4.2.2/dist/aframe-physics-system.min.js"></script>
+
+    </head>
+
+    <body>
+    <script>
+AFRAME.registerComponent('unified-move-limited', {
+  schema: {
+    speed: {type: 'number', default: 3},
+    minX: {type: 'number', default: -16},
+    maxX: {type: 'number', default: 19},
+    minZ: {type: 'number', default: -15},
+    maxZ: {type: 'number', default: 5}
+  },
+  init: function () {
+    this.keys = {};
+    window.addEventListener('keydown', e => this.keys[e.code] = true);
+    window.addEventListener('keyup', e => this.keys[e.code] = false);
+    this.direction = new THREE.Vector3();
+    this.velocity = new THREE.Vector3();
+  },
+  tick: function (time, deltaTime) {
+    const dt = deltaTime / 1000;
+    const camera = this.el.querySelector('[camera]');
+    if (!camera) return;
+
+    // --- 入力の取得 ---
+    let inputX = 0;
+    let inputY = 0;
+
+    // WASD入力
+    if (this.keys['KeyW']) inputY += 1;
+    if (this.keys['KeyS']) inputY -= 1;
+    if (this.keys['KeyA']) inputX -= 1;
+    if (this.keys['KeyD']) inputX += 1;
+
+    // スティック入力（VRコントローラー）
+    const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
+    for (let i = 0; i < gamepads.length; i++) {
+      const gp = gamepads[i];
+      if (gp && gp.connected && gp.axes.length >= 2) {
+        inputX += gp.axes[0];
+        inputY += -gp.axes[1]; // ← VRスティックは反転しない（自然な方向）逆に動くならここをinputY += "-"gp.axes[1]触る
+        break;
+      }
+    }
+
+    // 入力がなければ何もしない
+    if (Math.abs(inputX) < 0.05 && Math.abs(inputY) < 0.05) return;
+
+    // --- 移動方向の計算 ---
+    const camObj = camera.object3D;
+    const forward = new THREE.Vector3();
+    camObj.getWorldDirection(forward);
+    forward.y = 0;
+    forward.normalize();
+
+    const right = new THREE.Vector3().crossVectors(new THREE.Vector3(0, 1, 0), forward).normalize();
+
+    const move = new THREE.Vector3();
+    move.copy(forward).multiplyScalar(-inputY); // ← ここでWSの向きを修正！
+    move.add(right.multiplyScalar(inputX));
+    move.multiplyScalar(this.data.speed * dt);
+
+    // --- 移動と制限 ---
+    const pos = this.el.object3D.position;
+    pos.add(move);
+    pos.x = Math.max(this.data.minX, Math.min(this.data.maxX, pos.x));
+    pos.z = Math.max(this.data.minZ, Math.min(this.data.maxZ, pos.z));
+  }
+});
+</script>
+
+
+
+
+
+
+     <a-scene physics fog="type: linear; color: #001d3d; near: 10; far: 50">
+      <a-asset-item id="ctl_obj"
+				src="https://cdn.glitch.com/8091c095-dd99-4d26-9a32-d18db4b80561%2Foculus-touch-controller-right.obj?v=1605781569827">
+			</a-asset-item>
+			<a-asset-item id="ctl_mtl"
+				src="https://cdn.glitch.com/8091c095-dd99-4d26-9a32-d18db4b80561%2Foculus-touch-controller-right.mtl?v=1605781569345">
+			</a-asset-item>
+        <a-assets>
+                <!--3Dモデルの定義（Blenderなどで作成-->
+               
+                <a-asset-item id="box" src="box.glb"></a-asset-item>
+                <a-asset-item id="kumanomi" src="クマノミnew.glb" ></a-asset-item>
+                <a-asset-item id="suisou" src="only_suisou.glb" ></a-asset-item>
+                <a-asset-item id="syati" src="syachi.glb" ></a-asset-item>
+                <a-asset-item id="ei" src="ei.glb" ></a-asset-item>
+                 <a-asset-item id="same" src="サメ_1.glb" ></a-asset-item>
+                 <a-asset-item id="enzel" src="エンジェルフィッシュ.glb" ></a-asset-item>
+                 <a-asset-item id ="kurage" src="クラゲ.glb"></a-asset-item>
+                <a-asset-item id ="iwa" src="iwa4.glb"></a-asset-item>
+                <a-asset-item id ="kaisou" src="kaisou.glb"></a-asset-item>
+         </a-assets>
+          
+           <a-entity
+                gltf-model="#box" position="0 -1 0" shadow="receive:true"  
+           ></a-entity>
+         
+            
+           </a-entity>
+        <!-- 前面の壁（手前） -->
+<a-box position="1.5 3 -15.075" width="35.1" height="6.1" depth="0.05" color="#88c" opacity="0.2" transparent="true"></a-box>
+
+<!-- 背面の壁（奥） -->
+<a-box position="1.5 3 5.075" width="35.1" height="6.1" depth="0.05" color="#88c" opacity="0.2" transparent="true"></a-box>
+
+<!-- 左の壁 -->
+<a-box position="-16.075 3 -5" width="0.05" height="6.1" depth="20.1" color="#88c" opacity="0.2" transparent="true"></a-box>
+
+<!-- 右の壁 -->
+<a-box position="19.075 3 -5" width="0.05" height="6.1" depth="20.1" color="#88c" opacity="0.2" transparent="true"></a-box>
+
+<!-- 天井 -->
+<a-box position="1.5 6.075 -5" width="35.1" height="0.05" depth="20.1" color="#88c" opacity="0.2" transparent="true"></a-box>
+
+          <a-entity gltf-model="#ei" position="-40 8 30" shadow="receive:true" scale="0.5 0.5 0.5" animation-mixer
+          ></a-entity>
+           <a-entity gltf-model="#kurage" position="40 5 7"shadow="receive:true">
+
+           </a-entity>
+          <a-entity
+                gltf-model="#syati" position="0 20 -13" rotation="0 90 0" shadow="receive:true" animation-mixer scale="5 5 5"
+           ></a-entity>
+           
+           <a-entity
+            gltf-model="#kumanomi" position="0 8 10" shadow="receive:true" animation-mixer
+           ></a-entity>
+          <a-entity
+           gltf-model="#same" position="40 0 0" rotation="-90 0 90"  shadow="receive:true" animation-mixer
+           ></a-entity>
+           <a-entity
+           gltf-model="#iwa" position="40 10 0" shadow="receive:true" 
+           ></a-entity>
+           <a-entity 
+           gltf-model="#kaisou" position="0 0 0" shadow="receive:true" animation-mixer
+           ></a-entity>
+ <!--movement-controls-->
+      <a-entity id="rig" position="0 0 0" unified-move-limited="speed: 5; minX: -16; maxX: 19; minZ: -15; maxZ: 5">
+  <a-entity camera look-controls  position="0 1.6 0"></a-entity>
+  <a-entity id="ctl" laser-controls="hand: right" obj-model="obj: #ctl_obj; mtl: #ctl_mtl"></a-entity>
+</a-entity>        
+           <a-sky color="#003388">
+
+           </a-sky>
+        </a-scene>
+            
+    </body>
+</html>
+    
