@@ -42,8 +42,14 @@ AFRAME.registerComponent('unified-move-limited', {
     if (this.keys['KeyD']) inputX += 1;
 
     // --- VRコントローラー入力（右手優先） ---
-    const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
-    const gp = Array.from(gamepads).find(g => g && g.id.includes("Right"));
+   const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
+
+const gp = Array.from(gamepads).find(g =>
+  g &&
+  (g.hand === "right" ||
+   g.id.includes("Right") ||
+   (g.axes && g.axes.length === 4))
+);
     if (gp && gp.connected) {
       // デバッグ用ログ
       // console.log("右手:", gp.id, gp.axes);
@@ -168,7 +174,7 @@ function spawnWithDelay(parentEl, modelId, options) {
     el.setAttribute('shadow', 'receive:true');
     el.setAttribute('animation-mixer', '');
     el.setAttribute('mesh-standard-material', 'side:double; transparent:true; opacity:1');
-    if (modelId === '#angel') {
+    if (modelId === '#angel'||modelId === '#tyoutyo') {
       el.setAttribute('sin-forward-loop', 'amplitude:0.5; speed:2; axis:y');
     }
     parentEl.appendChild(el);
@@ -193,6 +199,7 @@ AFRAME.registerComponent('spawn-custom', {
     // クマノミ → ディレイ付き生成、Z制限あり
     spawnWithDelay(this.el, '#kumanomi', {count: 10, y: 2, scale: '0.3 0.3 0.3', delay: 1000, avoidZ: false});
 spawnWithDelay(this.el, '#angel', {count: 10, y: 10, scale: '0.5 0.5 0.5', delay: 2000, avoidZ: false});
+spawnWithDelay(this.el, '#tyoutyo', {count: 10, y: 10, scale: '0.5 0.5 0.5', delay: 2000, avoidZ: false});
     // クラゲ → ディレイ付き生成、Z制限あり
     spawnWithDelay(this.el, '#kurage', {count: 4, y: 4, scale: '0.4 0.4 0.4', delay: 1500, avoidZ: false});
   }
@@ -249,12 +256,49 @@ else if (this.direction === -1 && pos.z <= this.startPos.z) {
 
   }
 });
+
 </script>
 
+<script>
+AFRAME.registerComponent('controller-move', {
+  schema: {
+    speed: { default: 5 }
+  },
 
+  init: function () {
+    this.axisX = 0;
+    this.axisY = 0;
 
+    this.el.addEventListener('thumbstickmoved', (e) => {
+      this.axisX = e.detail.x;
+      this.axisY = e.detail.y;
+    });
+  },
 
+  tick: function (t, dt) {
+    if (Math.abs(this.axisX) < 0.1 && Math.abs(this.axisY) < 0.1) return;
 
+    const rig = document.querySelector('#rig');
+    const camera = rig.querySelector('[camera]');
+
+    const dir = new THREE.Vector3();
+    camera.object3D.getWorldDirection(dir);
+    dir.y = 0;
+    dir.normalize();
+
+    const right = new THREE.Vector3()
+      .crossVectors(new THREE.Vector3(0,1,0), dir)
+      .normalize();
+
+    const move = new THREE.Vector3();
+    move.addScaledVector(dir, -this.axisY);
+    move.addScaledVector(right, this.axisX);
+    move.multiplyScalar(this.data.speed * dt / 1000);
+
+    rig.object3D.position.add(move);
+  }
+});
+</script>
 
 
 
@@ -279,7 +323,8 @@ else if (this.direction === -1 && pos.z <= this.startPos.z) {
                 <a-asset-item id ="iwa" src="iwa4.glb"></a-asset-item>
                 <a-asset-item id ="kaisou" src="kaisou.glb"></a-asset-item>
                 <a-asset-item id="same_2" src="サメ1.glb" ></a-asset-item>
-                <a-asset-item id="syachi_2" src="new_syachi.glb" ></a-asset-item>
+               
+                 <a-asset-item id="tyoutyo" src="fishfisfh2.glb" ></a-asset-item>
          </a-assets>
           
            <a-entity
@@ -356,7 +401,14 @@ else if (this.direction === -1 && pos.z <= this.startPos.z) {
  <!--movement-controls-->
       <a-entity id="rig" position="0 0 0" unified-move-limited="speed: 5; minX: -16; maxX: 19; minZ: -15; maxZ: 5">
   <a-entity camera look-controls position="0 1.6 0"></a-entity>
-  <a-entity id="ctl"  obj-model="obj: #ctl_obj; mtl: #ctl_mtl"></a-entity>
+  <a-entity id="rightHand"
+  oculus-touch-controls="hand: right"
+  controller-move>
+</a-entity>
+
+<a-entity id="leftHand"
+  oculus-touch-controls="hand: left">
+</a-entity>
 </a-entity>
            <a-sky color="#003388">
 
