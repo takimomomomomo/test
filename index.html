@@ -12,7 +12,7 @@
 
     <body>
   <script>
-AFRAME.registerComponent('unified-move-limited', {
+/*AFRAME.registerComponent('unified-move-limited', {
   schema: {
     speed: {type: 'number', default: 3},
     minX: {type: 'number', default: -16},
@@ -92,7 +92,7 @@ const gp = Array.from(gamepads).find(g =>
     pos.x = Math.max(this.data.minX, Math.min(this.data.maxX, pos.x));
     pos.z = Math.max(this.data.minZ, Math.min(this.data.maxZ, pos.z));
   }
-});
+});*/
 </script>
 
 
@@ -174,7 +174,7 @@ function spawnWithDelay(parentEl, modelId, options) {
     el.setAttribute('shadow', 'receive:true');
     el.setAttribute('animation-mixer', '');
     el.setAttribute('mesh-standard-material', 'side:double; transparent:true; opacity:1');
-    if (modelId === '#angel'||modelId === '#tyoutyo') {
+    if (modelId === '#angel'||modelId === '#tyoutyo'||modelId === '#neon') {
       el.setAttribute('sin-forward-loop', 'amplitude:0.5; speed:2; axis:y');
     }
     parentEl.appendChild(el);
@@ -200,6 +200,7 @@ AFRAME.registerComponent('spawn-custom', {
     spawnWithDelay(this.el, '#kumanomi', {count: 10, y: 2, scale: '0.3 0.3 0.3', delay: 1000, avoidZ: false});
 spawnWithDelay(this.el, '#angel', {count: 10, y: 10, scale: '0.5 0.5 0.5', delay: 2000, avoidZ: false});
 spawnWithDelay(this.el, '#tyoutyo', {count: 10, y: 10, scale: '0.5 0.5 0.5', delay: 2000, avoidZ: false});
+spawnWithDelay(this.el, '#tyoutyo', {count: 10, y: 10, scale: '0.5 0.5 0.5', delay: 2100, avoidZ: false});
     // クラゲ → ディレイ付き生成、Z制限あり
     spawnWithDelay(this.el, '#kurage', {count: 4, y: 4, scale: '0.4 0.4 0.4', delay: 1500, avoidZ: false});
   }
@@ -260,9 +261,13 @@ else if (this.direction === -1 && pos.z <= this.startPos.z) {
 </script>
 
 <script>
-AFRAME.registerComponent('controller-move', {
+/*AFRAME.registerComponent('controller-move-limited', {
   schema: {
-    speed: { default: 5 }
+    speed: { default: 5 },
+    minX: { default: -16 },
+    maxX: { default: 19 },
+    minZ: { default: -15 },
+    maxZ: { default: 5 }
   },
 
   init: function () {
@@ -276,29 +281,110 @@ AFRAME.registerComponent('controller-move', {
   },
 
   tick: function (t, dt) {
+    // デッドゾーン
     if (Math.abs(this.axisX) < 0.1 && Math.abs(this.axisY) < 0.1) return;
 
     const rig = document.querySelector('#rig');
     const camera = rig.querySelector('[camera]');
 
-    const dir = new THREE.Vector3();
-    camera.object3D.getWorldDirection(dir);
-    dir.y = 0;
-    dir.normalize();
+    // カメラ向き
+    const forward = new THREE.Vector3();
+    camera.object3D.getWorldDirection(forward);
+    forward.y = 0;
+    forward.normalize();
 
     const right = new THREE.Vector3()
-      .crossVectors(new THREE.Vector3(0,1,0), dir)
+      .crossVectors(new THREE.Vector3(0, 1, 0), forward)
       .normalize();
 
+    // ★ 符号修正：前に倒したら前進
     const move = new THREE.Vector3();
-    move.addScaledVector(dir, -this.axisY);
+    move.addScaledVector(forward, this.axisY);
     move.addScaledVector(right, this.axisX);
     move.multiplyScalar(this.data.speed * dt / 1000);
 
-    rig.object3D.position.add(move);
+    // 移動
+    const pos = rig.object3D.position;
+    pos.add(move);
+
+    // ★ 移動制限
+    pos.x = Math.max(this.data.minX, Math.min(this.data.maxX, pos.x));
+    pos.z = Math.max(this.data.minZ, Math.min(this.data.maxZ, pos.z));
+  }
+});*/
+</script>
+
+<script>
+AFRAME.registerComponent('unified-move-limited-vr', {
+  schema: {
+    speed: { default: 5 },
+    minX: { default: -16 },
+    maxX: { default: 19 },
+    minZ: { default: -15 },
+    maxZ: { default: 5 }
+  },
+
+  init: function () {
+    // WASD
+    this.keys = {};
+    window.addEventListener('keydown', e => this.keys[e.code] = true);
+    window.addEventListener('keyup', e => this.keys[e.code] = false);
+
+    // VRスティック
+    this.axisX = 0;
+    this.axisY = 0;
+    this.el.addEventListener('thumbstickmoved', e => {
+      this.axisX = e.detail.x;
+      this.axisY = e.detail.y;
+    });
+  },
+
+  tick: function (t, dt) {
+    let inputX = 0;
+    let inputY = 0;
+
+    // --- WASD ---
+    if (this.keys['KeyW']) inputY -= 1;
+    if (this.keys['KeyS']) inputY += 1;
+    if (this.keys['KeyA']) inputX -= 1;
+    if (this.keys['KeyD']) inputX += 1;
+
+    // --- VRスティック ---
+    inputX += this.axisX;
+    inputY += this.axisY;
+
+    // デッドゾーン
+    if (Math.abs(inputX) < 0.1 && Math.abs(inputY) < 0.1) return;
+
+    const rig = document.querySelector('#rig');
+    const camera = rig.querySelector('[camera]');
+
+    // カメラ向き
+    const forward = new THREE.Vector3();
+    camera.object3D.getWorldDirection(forward);
+    forward.y = 0;
+    forward.normalize();
+
+    const right = new THREE.Vector3()
+      .crossVectors(new THREE.Vector3(0, 1, 0), forward)
+      .normalize();
+
+    // 移動方向
+    const move = new THREE.Vector3();
+    move.addScaledVector(forward, inputY);
+    move.addScaledVector(right, inputX);
+    move.multiplyScalar(this.data.speed * dt / 1000);
+
+    // 移動 + 制限
+    const pos = rig.object3D.position;
+    pos.add(move);
+    pos.x = Math.max(this.data.minX, Math.min(this.data.maxX, pos.x));
+    pos.z = Math.max(this.data.minZ, Math.min(this.data.maxZ, pos.z));
   }
 });
 </script>
+
+
 
 
 
@@ -323,7 +409,7 @@ AFRAME.registerComponent('controller-move', {
                 <a-asset-item id ="iwa" src="iwa4.glb"></a-asset-item>
                 <a-asset-item id ="kaisou" src="kaisou.glb"></a-asset-item>
                 <a-asset-item id="same_2" src="サメ1.glb" ></a-asset-item>
-               
+               <a-asset-item id="neon" src="neon 1.glb" ></a-asset-item>
                  <a-asset-item id="tyoutyo" src="fishfisfh2.glb" ></a-asset-item>
          </a-assets>
           
@@ -399,13 +485,17 @@ AFRAME.registerComponent('controller-move', {
            >
          <a-entity spawn-custom></a-entity>
  <!--movement-controls-->
-      <a-entity id="rig" position="0 0 0" unified-move-limited="speed: 5; minX: -16; maxX: 19; minZ: -15; maxZ: 5">
-  <a-entity camera look-controls position="0 1.6 0"></a-entity>
-  <a-entity id="rightHand"
-  oculus-touch-controls="hand: right"
-  controller-move>
-</a-entity>
-
+      <a-entity id="rig" position="0 0 0">
+  <a-entity camera look-controls="pointerLockEnabled:true; mouseSensitivity:0.6" position="0 1.6 0"></a-entity>
+  <a-entity
+    oculus-touch-controls="hand: right"
+    unified-move-limited-vr="
+      speed: 5;
+      minX: -16;
+      maxX: 19;
+      minZ: -15;
+      maxZ: 5">
+  </a-entity>
 <a-entity id="leftHand"
   oculus-touch-controls="hand: left">
 </a-entity>
