@@ -46,11 +46,25 @@ AFRAME.registerComponent('unified-move-limited', {
   const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
 for (let i = 0; i < gamepads.length; i++) {
   const gp = gamepads[i];
-  if (gp && gp.connected && gp.axes.length >= 4) {
-    // 右スティックを使用
-    inputX += gp.axes[2] || 0;
-    inputY += -(gp.axes[3] || 0); // 前進を自然な方向に
-    break;
+  if (gp && gp.connected) {
+    console.log("id:", gp.id, "axes:", gp.axes);
+
+    // 右コントローラーを判定
+    if (gp.id.toLowerCase().includes("right")) {
+      // まず [2,3] を試す
+      let rx = gp.axes[2] || 0;
+      let ry = gp.axes[3] || 0;
+
+      // もし [2,3] が常に 0 なら [0,1] を使う
+      if (Math.abs(rx) < 0.01 && Math.abs(ry) < 0.01) {
+        rx = gp.axes[0] || 0;
+        ry = gp.axes[1] || 0;
+      }
+
+      inputX += rx;
+      inputY += -ry;
+      break;
+    }
   }
 }
 
