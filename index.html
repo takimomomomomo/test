@@ -11,7 +11,7 @@
     </head>
 
     <body>
-    <script>
+  <script>
 AFRAME.registerComponent('unified-move-limited', {
   schema: {
     speed: {type: 'number', default: 3},
@@ -32,41 +32,41 @@ AFRAME.registerComponent('unified-move-limited', {
     const camera = this.el.querySelector('[camera]');
     if (!camera) return;
 
-    
     let inputX = 0;
     let inputY = 0;
 
-    // WASD入力
+    // --- キーボード入力 ---
     if (this.keys['KeyW']) inputY += 1;
     if (this.keys['KeyS']) inputY -= 1;
     if (this.keys['KeyA']) inputX -= 1;
     if (this.keys['KeyD']) inputX += 1;
 
-    // スティック入力（VRコントローラー）
- const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
-for (let i = 0; i < gamepads.length; i++) {
-  const gp = gamepads[i];
-  if (gp && gp.connected && gp.id.toLowerCase().includes("right")) {
-    // 右スティックの軸を確認
-    let rx = gp.axes[2] || 0;
-    let ry = gp.axes[3] || 0;
+    // --- VRコントローラー入力（右手優先） ---
+    const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
+    const gp = gamepads[1] || gamepads[0]; // 右手は通常 index=1
+    if (gp && gp.connected) {
+      // デバッグ用ログ
+      // console.log("右手:", gp.id, gp.axes);
 
-    // もし常に0なら [0,1] をfallback
-    if (Math.abs(rx) < 0.01 && Math.abs(ry) < 0.01) {
-      rx = gp.axes[0] || 0;
-      ry = gp.axes[1] || 0;
+      let rx = gp.axes[2] || 0;
+      let ry = gp.axes[3] || 0;
+
+      // もし常に0なら [0,1] をfallback
+      if (Math.abs(rx) < 0.01 && Math.abs(ry) < 0.01) {
+        rx = gp.axes[0] || 0;
+        ry = gp.axes[1] || 0;
+      }
+
+      inputX += rx;
+      inputY += -ry;
     }
 
-    inputX += rx;
-    inputY += -ry;
-    break;
-  }
-}
+    // --- デッドゾーン処理 ---
+    if (Math.abs(inputX) < 0.1) inputX = 0;
+    if (Math.abs(inputY) < 0.1) inputY = 0;
+    if (inputX === 0 && inputY === 0) return;
 
-    // 入力がなければ何もしない
-    if (Math.abs(inputX) < 0.05 && Math.abs(inputY) < 0.05) return;
-
-    
+    // --- 移動方向計算 ---
     const camObj = camera.object3D;
     const forward = new THREE.Vector3();
     camObj.getWorldDirection(forward);
@@ -76,7 +76,7 @@ for (let i = 0; i < gamepads.length; i++) {
     const right = new THREE.Vector3().crossVectors(new THREE.Vector3(0, 1, 0), forward).normalize();
 
     const move = new THREE.Vector3();
-    move.copy(forward).multiplyScalar(-inputY); // ← ここでWSの向きを修正！
+    move.copy(forward).multiplyScalar(-inputY);
     move.add(right.multiplyScalar(inputX));
     move.multiplyScalar(this.data.speed * dt);
 
