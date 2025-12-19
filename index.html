@@ -174,8 +174,10 @@ function spawnWithDelay(parentEl, modelId, options) {
     el.setAttribute('shadow', 'receive:true');
     el.setAttribute('animation-mixer', '');
     el.setAttribute('mesh-standard-material', 'side:double; transparent:true; opacity:1');
-    if (modelId === '#angel'||modelId === '#tyoutyo'||modelId === '#neon') {
-      el.setAttribute('sin-forward-loop', 'amplitude:0.5; speed:2; axis:y');
+    if (modelId === '#angel'||modelId === '#tyoutyo') {
+      el.setAttribute('sin-forward-loop_1', 'amplitude:0.5; speed:2; axis:y');
+    }else if(modelId === '#neon'){
+ el.setAttribute('sin-forward-loop_2', 'amplitude:0.5; speed:2; axis:y');
     }
     parentEl.appendChild(el);
 
@@ -200,7 +202,7 @@ AFRAME.registerComponent('spawn-custom', {
     spawnWithDelay(this.el, '#kumanomi', {count: 10, y: 2, scale: '0.3 0.3 0.3', delay: 1000, avoidZ: false});
 spawnWithDelay(this.el, '#angel', {count: 10, y: 10, scale: '0.5 0.5 0.5', delay: 2000, avoidZ: false});
 spawnWithDelay(this.el, '#tyoutyo', {count: 10, y: 10, scale: '0.5 0.5 0.5', delay: 2000, avoidZ: false});
-spawnWithDelay(this.el, '#tyoutyo', {count: 10, y: 10, scale: '0.5 0.5 0.5', delay: 2100, avoidZ: false});
+spawnWithDelay(this.el, '#neon', {count: 10, y: 10, scale: '0.5 0.5 0.5', delay: 2100, avoidZ: false});
     // クラゲ → ディレイ付き生成、Z制限あり
     spawnWithDelay(this.el, '#kurage', {count: 4, y: 4, scale: '0.4 0.4 0.4', delay: 1500, avoidZ: false});
   }
@@ -213,7 +215,7 @@ spawnWithDelay(this.el, '#tyoutyo', {count: 10, y: 10, scale: '0.5 0.5 0.5', del
 
 
 <script>
-AFRAME.registerComponent('sin-forward-loop', {
+AFRAME.registerComponent('sin-forward-loop_1', {
     //上下の移動(エンゼルフィッシュに使用(z軸だけ)
   schema: {
     amplitude: {type: 'number', default: 0.5},   
@@ -255,6 +257,50 @@ else if (this.direction === -1 && pos.z <= this.startPos.z) {
   });
 }
 
+  }
+});
+AFRAME.registerComponent('sin-forward-loop_2', {
+  schema: {
+    amplitude: {type: 'number', default: 0.5},
+    speed: {type: 'number', default: 2},
+    forwardSpeed: {type: 'number', default: 0.05},
+    distance: {type: 'number', default: 20}
+  },
+
+  init: function () {
+    this.startPos = this.el.object3D.position.clone();
+    this.direction = 1;
+  },
+
+  tick: function (time, delta) {
+    const t = time / 1000;
+    const pos = this.el.object3D.position;
+
+    // 上下の揺れ
+    pos.y = this.startPos.y + Math.sin(t * this.data.speed) * this.data.amplitude;
+
+    // X方向に前進・後退
+    pos.x += this.direction * this.data.forwardSpeed * (delta / 16);
+
+    // 距離で反転
+    if (this.direction === 1 && pos.x >= this.startPos.x + this.data.distance) {
+      this.direction = -1;
+      this.el.setAttribute('animation', {
+        property: 'rotation',
+        to: '0 0 0',
+        dur: 1500,
+        easing: 'easeInOutQuad'
+      });
+    }
+    else if (this.direction === -1 && pos.x <= this.startPos.x) {
+      this.direction = 1;
+      this.el.setAttribute('animation', {
+        property: 'rotation',
+        to: '0 -180 0',
+        dur: 1500,
+        easing: 'easeInOutQuad'
+      });
+    }
   }
 });
 
