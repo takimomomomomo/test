@@ -21,12 +21,53 @@ AFRAME.registerComponent('unified-move-limited', {
     maxZ: {type: 'number', default: 5}
   },
   init: function () {
+    // --- キーボード初期化（元のまま） ---
     this.keys = {};
     window.addEventListener('keydown', e => this.keys[e.code] = true);
     window.addEventListener('keyup', e => this.keys[e.code] = false);
-    this.direction = new THREE.Vector3();
-    this.velocity = new THREE.Vector3();
+
+    // --- VRコントローラー入力値の保持用 ---
+    this.controllerInput = { x: 0, y: 0 };
+
+    // --- コントローラーのイベントリスナー設定 ---
+    // 右手のコントローラーを探して、スティック操作(axismove)を監視します
+    const rig = this.el;
+    
+    // コントローラーが読み込まれるのを待つため、少し遅延させるか、
+    // または子要素のコントローラーに対してリスナーを貼ります。
+    // ここでは、DOM内にある laser-controls="hand: right" を探します。
+    const setupController = () => {
+      const controllerEl = document.querySelector('[laser-controls="hand: right"]');
+      if (controllerEl) {
+        controllerEl.addEventListener('axismove', (evt) => {
+          // evt.detail.axis は配列です。[x, y] または [0, 0, x, y] の場合があります
+          let x = 0, y = 0;
+          if (evt.detail.axis.length >= 4) {
+             // Oculus Touchなどは [2], [3] にスティックが入ることが多い
+             x = evt.detail.axis[2];
+             y = evt.detail.axis[3];
+          } else if (evt.detail.axis.length >= 2) {
+             x = evt.detail.axis[0];
+             y = evt.detail.axis[1];
+          }
+          
+          // 値を保持
+          this.controllerInput.x = x;
+          this.controllerInput.y = y;
+        });
+        // 見つかったらループを止めるなどの処理が必要ですが、
+        // 簡易的に一度設定できればOKとします
+      }
+    };
+
+    // シーンロード時、または即時に設定を試みる
+    if (this.el.sceneEl.hasLoaded) {
+      setupController();
+    } else {
+      this.el.sceneEl.addEventListener('loaded', setupController);
+    }
   },
+
   tick: function (time, deltaTime) {
     const dt = deltaTime / 1000;
     const camera = this.el.querySelector('[camera]');
@@ -35,38 +76,30 @@ AFRAME.registerComponent('unified-move-limited', {
     let inputX = 0;
     let inputY = 0;
 
-    // --- キーボード入力 ---
+    // --- キーボード入力（元のまま） ---
     if (this.keys['KeyW']) inputY += 1;
     if (this.keys['KeyS']) inputY -= 1;
     if (this.keys['KeyA']) inputX -= 1;
     if (this.keys['KeyD']) inputX += 1;
 
-    // --- VRコントローラー入力（右手優先） ---
-    const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
-    const gp = Array.from(gamepads).find(g => g && g.id.includes("Right"));
-    if (gp && gp.connected) {
-      // デバッグ用ログ
-      // console.log("右手:", gp.id, gp.axes);
-
-      let rx = gp.axes[2] !== undefined ? gp.axes[2] : gp.axes[0];
-      let ry = gp.axes[3] !== undefined ? gp.axes[3] : gp.axes[1];
-
-      // もし常に0なら [0,1] をfallback
-      if (Math.abs(rx) < 0.01 && Math.abs(ry) < 0.01) {
-        rx = gp.axes[0] || 0;
-        ry = gp.axes[1] || 0;
-      }
-
-      inputX += rx;
-      inputY += -ry;
+    // --- VRコントローラー入力（修正箇所） ---
+    // キー入力がない場合、コントローラーの値を採用する
+    // (両方入力された場合の干渉を防ぐため、単純加算または優先順位付け)
+    if (inputX === 0 && Math.abs(this.controllerInput.x) > 0.1) {
+       inputX = this.controllerInput.x;
+    }
+    if (inputY === 0 && Math.abs(this.controllerInput.y) > 0.1) {
+       // スティック上はマイナス値、下はプラス値で返ってくるのが一般的。
+       // 元のコード(Wキー)では「前進 = inputYプラス」として処理されているため、符号を反転させます
+       inputY = -this.controllerInput.y; 
     }
 
-    // --- デッドゾーン処理 ---
+    // --- デッドゾーン処理（元のまま） ---
     if (Math.abs(inputX) < 0.1) inputX = 0;
     if (Math.abs(inputY) < 0.1) inputY = 0;
     if (inputX === 0 && inputY === 0) return;
 
-    // --- 移動方向計算 ---
+    // --- 移動方向計算（元のまま） ---
     const camObj = camera.object3D;
     const forward = new THREE.Vector3();
     camObj.getWorldDirection(forward);
@@ -76,11 +109,14 @@ AFRAME.registerComponent('unified-move-limited', {
     const right = new THREE.Vector3().crossVectors(forward, new THREE.Vector3(0, 1, 0)).normalize();
 
     const move = new THREE.Vector3();
+    // 元のロジック: inputYがプラスなら forward方向にマイナス倍して進む？
+    // 元のコード: move.copy(forward).multiplyScalar(-inputY);
+    // これを変えずに動作させるため、上のVR入力部分で符号を合わせてあります。
     move.copy(forward).multiplyScalar(-inputY);
     move.add(right.multiplyScalar(inputX));
     move.multiplyScalar(this.data.speed * dt);
 
-    // --- 移動と制限 ---
+    // --- 移動と制限（元のまま） ---
     const pos = this.el.object3D.position;
     pos.add(move);
     pos.x = Math.max(this.data.minX, Math.min(this.data.maxX, pos.x));
@@ -88,6 +124,15 @@ AFRAME.registerComponent('unified-move-limited', {
   }
 });
 </script>
+
+<a-entity id="rig" position="0 0 0" unified-move-limited="speed: 5; minX: -16; maxX: 19; minZ: -15; maxZ: 5">
+  <a-entity camera look-controls position="0 1.6 0"></a-entity>
+  <!-- コントローラーに oculus-touch-controls を追加すると動作が安定します -->
+  <a-entity id="ctl" 
+            laser-controls="hand: right" 
+            oculus-touch-controls="hand: right"
+            obj-model="obj: #ctl_obj; mtl: #ctl_mtl"></a-entity>
+</a-entity>
 
 
 <script>
