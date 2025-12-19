@@ -11,8 +11,9 @@
     </head>
 
     <body>
-  <script>
-/*AFRAME.registerComponent('unified-move-limited', {
+
+    <script>
+AFRAME.registerComponent('unified-move-limited', {
   schema: {
     speed: {type: 'number', default: 3},
     minX: {type: 'number', default: -16},
@@ -32,47 +33,31 @@
     const camera = this.el.querySelector('[camera]');
     if (!camera) return;
 
+    
     let inputX = 0;
     let inputY = 0;
 
-    // --- キーボード入力 ---
+    // WASD入力
     if (this.keys['KeyW']) inputY += 1;
     if (this.keys['KeyS']) inputY -= 1;
     if (this.keys['KeyA']) inputX -= 1;
     if (this.keys['KeyD']) inputX += 1;
 
-    // --- VRコントローラー入力（右手優先） ---
-   const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
-
-const gp = Array.from(gamepads).find(g =>
-  g &&
-  (g.hand === "right" ||
-   g.id.includes("Right") ||
-   (g.axes && g.axes.length === 4))
-);
-    if (gp && gp.connected) {
-      // デバッグ用ログ
-      // console.log("右手:", gp.id, gp.axes);
-
-      let rx = gp.axes[2] !== undefined ? gp.axes[2] : gp.axes[0];
-      let ry = gp.axes[3] !== undefined ? gp.axes[3] : gp.axes[1];
-
-      // もし常に0なら [0,1] をfallback
-      if (Math.abs(rx) < 0.01 && Math.abs(ry) < 0.01) {
-        rx = gp.axes[0] ?? 0;
-        ry = gp.axes[1] ?? 0;
+    // スティック入力（VRコントローラー）
+    const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
+    for (let i = 0; i < gamepads.length; i++) {
+      const gp = gamepads[i];
+      if (gp && gp.connected && gp.axes.length >= 2) {
+        inputX += gp.axes[0];
+        inputY += -gp.axes[1]; // ← VRスティックは反転しない（自然な方向）逆に動くならここをinputY += "-"gp.axes[1]触る
+        break;
       }
-
-      inputX += rx;
-      inputY += -ry;
     }
 
-    // --- デッドゾーン処理 ---
-    if (Math.abs(inputX) < 0.1) inputX = 0;
-    if (Math.abs(inputY) < 0.1) inputY = 0;
-    if (inputX === 0 && inputY === 0) return;
+    // 入力がなければ何もしない
+    if (Math.abs(inputX) < 0.05 && Math.abs(inputY) < 0.05) return;
 
-    // --- 移動方向計算 ---
+    
     const camObj = camera.object3D;
     const forward = new THREE.Vector3();
     camObj.getWorldDirection(forward);
@@ -82,7 +67,7 @@ const gp = Array.from(gamepads).find(g =>
     const right = new THREE.Vector3().crossVectors(new THREE.Vector3(0, 1, 0), forward).normalize();
 
     const move = new THREE.Vector3();
-    move.copy(forward).multiplyScalar(-inputY);
+    move.copy(forward).multiplyScalar(-inputY); // ← ここでWSの向きを修正！
     move.add(right.multiplyScalar(inputX));
     move.multiplyScalar(this.data.speed * dt);
 
@@ -92,9 +77,8 @@ const gp = Array.from(gamepads).find(g =>
     pos.x = Math.max(this.data.minX, Math.min(this.data.maxX, pos.x));
     pos.z = Math.max(this.data.minZ, Math.min(this.data.maxZ, pos.z));
   }
-});*/
+});
 </script>
-
 
 <script>
 AFRAME.registerComponent('no-cull', {
@@ -174,10 +158,8 @@ function spawnWithDelay(parentEl, modelId, options) {
     el.setAttribute('shadow', 'receive:true');
     el.setAttribute('animation-mixer', '');
     el.setAttribute('mesh-standard-material', 'side:double; transparent:true; opacity:1');
-    if (modelId === '#angel'||modelId === '#tyoutyo') {
-      el.setAttribute('sin-forward-loop_1', 'amplitude:0.5; speed:2; axis:y');
-    }else if(modelId === '#neon'){
- el.setAttribute('sin-forward-loop_2', 'amplitude:0.5; speed:2; axis:y');
+    if (modelId === '#angel') {
+      el.setAttribute('sin-forward-loop', 'amplitude:0.5; speed:2; axis:y');
     }
     parentEl.appendChild(el);
 
@@ -201,8 +183,6 @@ AFRAME.registerComponent('spawn-custom', {
     // クマノミ → ディレイ付き生成、Z制限あり
     spawnWithDelay(this.el, '#kumanomi', {count: 10, y: 2, scale: '0.3 0.3 0.3', delay: 1000, avoidZ: false});
 spawnWithDelay(this.el, '#angel', {count: 10, y: 10, scale: '0.5 0.5 0.5', delay: 2000, avoidZ: false});
-spawnWithDelay(this.el, '#tyoutyo', {count: 10, y: 10, scale: '0.5 0.5 0.5', delay: 2000, avoidZ: false});
-spawnWithDelay(this.el, '#neon', {count: 10, y: 10, scale: '0.5 0.5 0.5', delay: 2100, avoidZ: false});
     // クラゲ → ディレイ付き生成、Z制限あり
     spawnWithDelay(this.el, '#kurage', {count: 4, y: 4, scale: '0.4 0.4 0.4', delay: 1500, avoidZ: false});
   }
@@ -215,7 +195,7 @@ spawnWithDelay(this.el, '#neon', {count: 10, y: 10, scale: '0.5 0.5 0.5', delay:
 
 
 <script>
-AFRAME.registerComponent('sin-forward-loop_1', {
+AFRAME.registerComponent('sin-forward-loop', {
     //上下の移動(エンゼルフィッシュに使用(z軸だけ)
   schema: {
     amplitude: {type: 'number', default: 0.5},   
@@ -259,176 +239,25 @@ else if (this.direction === -1 && pos.z <= this.startPos.z) {
 
   }
 });
-AFRAME.registerComponent('sin-forward-loop_2', {
-  schema: {
-    amplitude: {type: 'number', default: 0.5},
-    speed: {type: 'number', default: 2},
-    forwardSpeed: {type: 'number', default: 0.05},
-    distance: {type: 'number', default: 20}
-  },
-
-  init: function () {
-    this.startPos = this.el.object3D.position.clone();
-    this.direction = 1;
-  },
-
-  tick: function (time, delta) {
-    const t = time / 1000;
-    const pos = this.el.object3D.position;
-
-    // 上下の揺れ
-    pos.y = this.startPos.y + Math.sin(t * this.data.speed) * this.data.amplitude;
-
-    // X方向に前進・後退
-    pos.x += this.direction * this.data.forwardSpeed * (delta / 16);
-
-    // 距離で反転
-    if (this.direction === 1 && pos.x >= this.startPos.x + this.data.distance) {
-      this.direction = -1;
-      this.el.setAttribute('animation', {
-        property: 'rotation',
-        to: '0 0 0',
-        dur: 1500,
-        easing: 'easeInOutQuad'
-      });
-    }
-    else if (this.direction === -1 && pos.x <= this.startPos.x) {
-      this.direction = 1;
-      this.el.setAttribute('animation', {
-        property: 'rotation',
-        to: '0 -180 0',
-        dur: 1500,
-        easing: 'easeInOutQuad'
-      });
-    }
-  }
-});
-
 </script>
 
 <script>
-/*AFRAME.registerComponent('controller-move-limited', {
-  schema: {
-    speed: { default: 5 },
-    minX: { default: -16 },
-    maxX: { default: 19 },
-    minZ: { default: -15 },
-    maxZ: { default: 5 }
-  },
+  AFRAME.registerComponent('play-video-on-enter', {
+    init: function () {
+      this.video = this.el.getAttribute('material').src;
+  
+      window.addEventListener('keydown', (e) => {
+        if (e.code === 'Enter') {
+          this.video.play();
+        }
+      });
+    }
+  });
+  </script>
+  
 
-  init: function () {
-    this.axisX = 0;
-    this.axisY = 0;
 
-    this.el.addEventListener('thumbstickmoved', (e) => {
-      this.axisX = e.detail.x;
-      this.axisY = e.detail.y;
-    });
-  },
 
-  tick: function (t, dt) {
-    // デッドゾーン
-    if (Math.abs(this.axisX) < 0.1 && Math.abs(this.axisY) < 0.1) return;
-
-    const rig = document.querySelector('#rig');
-    const camera = rig.querySelector('[camera]');
-
-    // カメラ向き
-    const forward = new THREE.Vector3();
-    camera.object3D.getWorldDirection(forward);
-    forward.y = 0;
-    forward.normalize();
-
-    const right = new THREE.Vector3()
-      .crossVectors(new THREE.Vector3(0, 1, 0), forward)
-      .normalize();
-
-    // ★ 符号修正：前に倒したら前進
-    const move = new THREE.Vector3();
-    move.addScaledVector(forward, this.axisY);
-    move.addScaledVector(right, this.axisX);
-    move.multiplyScalar(this.data.speed * dt / 1000);
-
-    // 移動
-    const pos = rig.object3D.position;
-    pos.add(move);
-
-    // ★ 移動制限
-    pos.x = Math.max(this.data.minX, Math.min(this.data.maxX, pos.x));
-    pos.z = Math.max(this.data.minZ, Math.min(this.data.maxZ, pos.z));
-  }
-});*/
-</script>
-
-<script>
-AFRAME.registerComponent('unified-move-limited-vr', {
-  schema: {
-    speed: { default: 5 },
-    minX: { default: -16 },
-    maxX: { default: 19 },
-    minZ: { default: -15 },
-    maxZ: { default: 5 }
-  },
-
-  init: function () {
-    // WASD
-    this.keys = {};
-    window.addEventListener('keydown', e => this.keys[e.code] = true);
-    window.addEventListener('keyup', e => this.keys[e.code] = false);
-
-    // VRスティック
-    this.axisX = 0;
-    this.axisY = 0;
-    this.el.addEventListener('thumbstickmoved', e => {
-      this.axisX = e.detail.x;
-      this.axisY = e.detail.y;
-    });
-  },
-
-  tick: function (t, dt) {
-    let inputX = 0;
-    let inputY = 0;
-
-    // --- WASD ---
-    if (this.keys['KeyW']) inputY -= 1;
-    if (this.keys['KeyS']) inputY += 1;
-    if (this.keys['KeyA']) inputX -= 1;
-    if (this.keys['KeyD']) inputX += 1;
-
-    // --- VRスティック ---
-    inputX += this.axisX;
-    inputY += this.axisY;
-
-    // デッドゾーン
-    if (Math.abs(inputX) < 0.1 && Math.abs(inputY) < 0.1) return;
-
-    const rig = document.querySelector('#rig');
-    const camera = rig.querySelector('[camera]');
-
-    // カメラ向き
-    const forward = new THREE.Vector3();
-    camera.object3D.getWorldDirection(forward);
-    forward.y = 0;
-    forward.normalize();
-
-    const right = new THREE.Vector3()
-      .crossVectors(new THREE.Vector3(0, 1, 0), forward)
-      .normalize();
-
-    // 移動方向
-    const move = new THREE.Vector3();
-    move.addScaledVector(forward, inputY);
-    move.addScaledVector(right, inputX);
-    move.multiplyScalar(this.data.speed * dt / 1000);
-
-    // 移動 + 制限
-    const pos = rig.object3D.position;
-    pos.add(move);
-    pos.x = Math.max(this.data.minX, Math.min(this.data.maxX, pos.x));
-    pos.z = Math.max(this.data.minZ, Math.min(this.data.maxZ, pos.z));
-  }
-});
-</script>
 
 
 
@@ -447,6 +276,7 @@ AFRAME.registerComponent('unified-move-limited-vr', {
                
                 <a-asset-item id="box" src="box.glb"></a-asset-item>
                 <a-asset-item id="kumanomi" src="クマノミnew.glb" ></a-asset-item>
+                <a-asset-item id="suisou" src="only_suisou.glb" ></a-asset-item>
                 <a-asset-item id="syachi_1" src="syachi.glb" ></a-asset-item>
                 <a-asset-item id="ei" src="ei.glb" ></a-asset-item>
                  <a-asset-item id="same" src="サメ_1.glb" ></a-asset-item>
@@ -455,8 +285,8 @@ AFRAME.registerComponent('unified-move-limited-vr', {
                 <a-asset-item id ="iwa" src="iwa4.glb"></a-asset-item>
                 <a-asset-item id ="kaisou" src="kaisou.glb"></a-asset-item>
                 <a-asset-item id="same_2" src="サメ1.glb" ></a-asset-item>
-               <a-asset-item id="neon" src="neon 1.glb" ></a-asset-item>
-                 <a-asset-item id="tyoutyo" src="fishfisfh2.glb" ></a-asset-item>
+                <a-asset-item id="syachi_2" src="new_syachi.glb" ></a-asset-item>
+                <a-asset-item id="kairi" src="face.glb" ></a-asset-item>
          </a-assets>
           
            <a-entity
@@ -465,7 +295,6 @@ AFRAME.registerComponent('unified-move-limited-vr', {
          
 
             
-           </a-entity>
 <!-- 前面 -->
 <!-- 前面の壁 -->
 <a-plane position="1.5 3 -15.05"   
@@ -498,7 +327,7 @@ AFRAME.registerComponent('unified-move-limited-vr', {
          color="#88c"
          material="transparent:true; opacity:0.5; depthTest:false">
 </a-plane>
-<a-box position="1.5 6.075 -5" width="35.1" height="0.05" depth="20.1" color="#88c" opacity="0.05" transparent="true" depthWrite:false></a-box>
+<a-box position="1.5 6.075 -5" width="35.1" height="0.05" depth="20.1" color="#88c" opacity="0.05" transparent="true"></a-box>
 
 
 
@@ -507,7 +336,6 @@ AFRAME.registerComponent('unified-move-limited-vr', {
           <a-entity  gltf-model="#ei" position="20  12 40" rotation ="180 -90 180" shadow="receive:true" scale="0.5 0.5 0.5" animation-mixer no-cull
           ></a-entity>
           
-           </a-entity>
           <a-entity
                 gltf-model="#syachi_1" no-cull position="0 20 -13" rotation="0 90 0" shadow="receive:true" animation-mixer scale="5 5 5"
            ></a-entity>
@@ -523,33 +351,32 @@ AFRAME.registerComponent('unified-move-limited-vr', {
            gltf-model="#same" no-cull position="5 20 -20"   shadow="receive:true" animation-mixer
            ></a-entity>
            <a-entity
-           gltf-model="#same_2" no-cull position="-10 20 10" rotation="0 90 0"  shadow="receive:true" animation-mixer
+           gltf-model="#same_2" no-cull position="-10 20 10" rotation="0 -90 0"  shadow="receive:true" animation-mixer
            ></a-entity>
            <a-entity
            gltf-model="#iwa"  position="40 0 0" shadow="receive:true" 
            ></a-entity>
-           >
+           <a-entity gltf-model="#kairi" position="20 0 -16" shadow="receive:true" rotation="0 90 0" scale="0.1 0.1 0.1"></a-entity>
          <a-entity spawn-custom></a-entity>
+
  <!--movement-controls-->
-      <a-entity id="rig" position="0 0 0">
-  <a-entity camera look-controls="pointerLockEnabled:true; mouseSensitivity:0.6" position="0 1.6 0"></a-entity>
-  <a-entity
-    oculus-touch-controls="hand: right"
-    unified-move-limited-vr="
-      speed: 5;
-      minX: -16;
-      maxX: 19;
-      minZ: -15;
-      maxZ: 5">
-  </a-entity>
-<a-entity id="leftHand"
-  oculus-touch-controls="hand: left">
-</a-entity>
+      <a-entity id="rig" position="0 0 0" unified-move-limited="speed: 5; minX: -16; maxX: 19; minZ: -15; maxZ: 5">
+  <a-entity camera look-controls="pointerLockEnabled:true; mouseSensitivity:0.6"  position="0 1.6 0"></a-entity>
+
+  <a-entity id="ctl" laser-controls="hand: right" obj-model="obj: #ctl_obj; mtl: #ctl_mtl"></a-entity>
 </a-entity>
            <a-sky color="#003388">
 
            </a-sky>
         </a-scene>
-            
+
+        <script>
+          window.addEventListener('keydown', (e) => {
+            if (e.code === 'Enter') {  // ← 左Ctrl
+              window.location.href = 'part2.html';
+            }
+          });
+        </script>
+
     </body>
 </html>

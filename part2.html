@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Sea Shooting Game</title>
+  <script src="https://aframe.io/releases/1.7.0/aframe.min.js"></script>
+
+  <style>
+    body, a-scene {
+      margin: 0;
+      cursor: none;
+    }
+  </style>
+
+  <script>
+    const HP_BAR_WIDTH = 1.2;
+
+    let gameStarted = false;
+    let stage = 1; // 1:kaisou 2:shark 3:kairi
+    let titleEl, startEl;
+
+    /* ---------- ランダム移動 ---------- */
+    AFRAME.registerComponent('random-move', {
+      schema: { range: { default: 5 }, interval: { default: 1500 } },
+      init() {
+        this.move();
+        this.timer = setInterval(() => this.move(), this.data.interval);
+      },
+      move() {
+        const r = this.data.range;
+        const x = (Math.random() * 2 - 1) * r;
+        const y = Math.random() * 2 + 1.5;
+        const z = -Math.random() * r - 3;
+        this.el.setAttribute('animation', {
+          property: 'position',
+          to: `${x} ${y} ${z}`,
+          dur: 1200,
+          easing: 'easeInOutQuad'
+        });
+      }
+    });
+
+    /* ---------- 弾 ---------- */
+    AFRAME.registerComponent('bullet', {
+      schema: { speed: { default: 18 } },
+      init() {
+        const dir = new THREE.Vector3();
+        this.el.sceneEl.camera.getWorldDirection(dir);
+        this.velocity = dir.multiplyScalar(this.data.speed);
+      },
+      tick(time, delta) {
+        this.el.object3D.position.add(
+          this.velocity.clone().multiplyScalar(delta / 1000)
+        );
+        if (this.el.object3D.position.length() > 60) {
+          this.el.remove();
+        }
+      }
+    });
+
+    /* ---------- 的（当たり判定は親） ---------- */
+    AFRAME.registerComponent('target', {
+      schema: { maxHp: { default: 20 } },
+      init() {
+        this.hp = this.data.maxHp;
+
+        this.hpBar = document.createElement('a-plane');
+        this.hpBar.setAttribute('color', 'lime');
+        this.hpBar.setAttribute('width', HP_BAR_WIDTH);
+        this.hpBar.setAttribute('height', '0.12');
+        this.hpBar.setAttribute('position', '0 1.8 0');
+        this.el.appendChild(this.hpBar);
+      },
+      tick() {
+        if (!gameStarted || this.hp <= 0) return;
+
+        const bullets = document.querySelectorAll('.bullet');
+        const pos = this.el.object3D.position;
+
+        bullets.forEach(b => {
+          if (pos.distanceTo(b.object3D.position) < 1.0) {
+            const hitPos = b.object3D.position.clone();
+            b.remove();
+            spawnExplosion(hitPos);
+            this.damage();
+          }
+        });
+      },
+      damage() {
+        this.hp--;
+        const rate = this.hp / this.data.maxHp;
+
+        this.hpBar.setAttribute('width', HP_BAR_WIDTH * rate);
+        this.hpBar.setAttribute(
+          'position',
+          `${-(HP_BAR_WIDTH * (1 - rate)) / 2} 1.8 0`
+        );
+
+        if (this.hp <= 0) {
+          this.el.remove();
+          nextStage();
+        }
+      }
+    });
+
+    /* ---------- 射撃 ---------- */
+    AFRAME.registerComponent('shoot', {
+      init() {
+        window.addEventListener('mousedown', () => {
+          if (!gameStarted) return;
+
+          const cam = document.querySelector('[camera]');
+          const bullet = document.createElement('a-sphere');
+
+          bullet.setAttribute('radius', '0.05');
+          bullet.setAttribute('color', 'yellow');
+          bullet.setAttribute('bullet', '');
+          bullet.setAttribute('class', 'bullet');
+
+          const pos = new THREE.Vector3();
+          cam.object3D.getWorldPosition(pos);
+          bullet.object3D.position.copy(pos);
+
+          this.el.sceneEl.appendChild(bullet);
+        });
+      }
+    });
+
+    /* ---------- 爆発 ---------- */
+    function spawnExplosion(position) {
+      const scene = document.querySelector('a-scene');
+      for (let i = 0; i < 10; i++) {
+        const p = document.createElement('a-sphere');
+        p.setAttribute('radius', '0.04');
+        p.setAttribute('color', 'orange');
+        p.object3D.position.copy(position);
+
+        const dir = new THREE.Vector3(
+          Math.random() * 2 - 1,
+          Math.random() * 2 - 1,
+          Math.random() * 2 - 1
+        ).normalize().multiplyScalar(1.5);
+
+        p.setAttribute('animation', {
+          property: 'position',
+          to: `${position.x + dir.x} ${position.y + dir.y} ${position.z + dir.z}`,
+          dur: 400
+        });
+
+        p.setAttribute('animation__fade', {
+          property: 'material.opacity',
+          from: 1,
+          to: 0,
+          dur: 400
+        });
+
+        p.setAttribute('material', 'transparent:true');
+        scene.appendChild(p);
+        setTimeout(() => p.remove(), 450);
+      }
+    }
+
+    /* ---------- CLEAR ---------- */
+    function showClear() {
+      const camera = document.querySelector('[camera]');
+      const text = document.createElement('a-text');
+
+      text.setAttribute('value', 'CLEAR');
+      text.setAttribute('color', 'yellow');
+      text.setAttribute('align', 'center');
+      text.setAttribute('width', '6');
+      text.setAttribute('position', '0 0.4 -3');
+      text.setAttribute('shader', 'msdf');
+      text.setAttribute('font', 'https://cdn.aframe.io/fonts/Roboto-msdf.json');
+      text.setAttribute('outline-color', 'black');
+      text.setAttribute('outline-width', '0.05');
+
+      camera.appendChild(text);
+      setTimeout(() => text.remove(), 5000);
+    }
+
+    /* ---------- ステージ進行 ---------- */
+    function nextStage() {
+      if (stage === 1) {
+        stage = 2;
+        spawnTargetModel('サメ1.glb', 30, '0.6 0.6 0.6');
+      } 
+      else if (stage === 2) {
+        stage = 3;
+        spawnTargetModel('かいり.glb', 50, '0.8 0.8 0.8');
+      } 
+      else if (stage === 3) {
+        showClear();
+      }
+    }
+
+    /* ---------- モデル生成（親＋子） ---------- */
+    function spawnTargetModel(src, hp, scale) {
+      const scene = document.querySelector('a-scene');
+
+      // 親：当たり判定・移動
+      const wrapper = document.createElement('a-entity');
+
+      if (src === 'kaisou.glb') {
+        wrapper.setAttribute('position', '-10 2 -5');
+      } else {
+        wrapper.setAttribute('position', '0 2 -5');
+      }
+
+      wrapper.setAttribute('random-move', '');
+      wrapper.setAttribute('target', `maxHp:${hp}`);
+
+      // 子：見た目（glb）
+      const model = document.createElement('a-gltf-model');
+      model.setAttribute('src', src);
+      model.setAttribute('scale', scale);
+
+      // ★ 見た目ズレ補正
+      if (src === 'kaisou.glb') {
+        model.setAttribute('position', '-6.2 0 0');   // X マイナス
+      }
+      if (src === 'かいり.glb') {
+        model.setAttribute('position', '0 -3 0'); // Y マイナス ★
+      }
+
+      wrapper.appendChild(model);
+      scene.appendChild(wrapper);
+    }
+
+    /* ---------- タイトル ---------- */
+    function showTitle() {
+      const camera = document.querySelector('[camera]');
+
+      titleEl = document.createElement('a-text');
+      titleEl.setAttribute('value', 'SEA SHOOTING');
+      titleEl.setAttribute('align', 'center');
+      titleEl.setAttribute('color', 'white');
+      titleEl.setAttribute('width', '6');
+      titleEl.setAttribute('position', '0 0.4 -2');
+      titleEl.setAttribute('shader', 'msdf');
+      titleEl.setAttribute('font', 'https://cdn.aframe.io/fonts/Roboto-msdf.json');
+
+      startEl = document.createElement('a-text');
+      startEl.setAttribute('value', 'PRESS ENTER');
+      startEl.setAttribute('align', 'center');
+      startEl.setAttribute('color', 'yellow');
+      startEl.setAttribute('width', '4');
+      startEl.setAttribute('position', '0 -0.2 -2');
+      startEl.setAttribute('shader', 'msdf');
+      startEl.setAttribute('font', 'https://cdn.aframe.io/fonts/Roboto-msdf.json');
+
+      camera.appendChild(titleEl);
+      camera.appendChild(startEl);
+
+      window.addEventListener('keydown', e => {
+        if (e.key === 'Enter') startGame();
+      });
+    }
+
+    function startGame() {
+      if (gameStarted) return;
+      gameStarted = true;
+      titleEl.remove();
+      startEl.remove();
+      spawnTargetModel('kaisou.glb', 20, '0.5 0.5 0.5');
+    }
+
+    window.addEventListener('load', showTitle);
+  </script>
+</head>
+
+<body>
+  <!-- 🌊 海っぽい青の背景 -->
+  <a-scene background="color: #1e81b0">
+
+    <!-- カメラ -->
+    <a-entity camera look-controls="pointerLockEnabled:true" shoot position="0 1.6 0">
+      <!-- レティクル -->
+      <a-entity
+        position="0 0 -1"
+        geometry="primitive:ring; radiusInner:0.01; radiusOuter:0.015"
+        material="color:green; shader:flat">
+      </a-entity>
+    </a-entity>
+
+    <a-light type="ambient" intensity="0.7"></a-light>
+    <a-light type="directional" position="1 3 2"></a-light>
+    <a-plane rotation="-90 0 0" width="30" height="30" color="#2a4d69"></a-plane>
+
+  </a-scene>
+
+  <script>
+    window.addEventListener('keydown', (e) => {
+      if (e.code === 'ControlLeft') {  // ← 左Ctrl
+        window.location.href = 'index.html';
+      }
+    });
+  </script>
+  
+
+</body>
+</html>
