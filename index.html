@@ -43,13 +43,13 @@ AFRAME.registerComponent('unified-move-limited', {
 
     // --- VRコントローラー入力（右手優先） ---
     const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
-    const gp = gamepads[1] || gamepads[0]; // 右手は通常 index=1
+    const gp = Array.from(gamepads).find(g => g && g.id.includes("Right"));
     if (gp && gp.connected) {
       // デバッグ用ログ
       // console.log("右手:", gp.id, gp.axes);
 
-      let rx = gp.axes[2] || 0;
-      let ry = gp.axes[3] || 0;
+      let rx = gp.axes[2] !== undefined ? gp.axes[2] : gp.axes[0];
+      let ry = gp.axes[3] !== undefined ? gp.axes[3] : gp.axes[1];
 
       // もし常に0なら [0,1] をfallback
       if (Math.abs(rx) < 0.01 && Math.abs(ry) < 0.01) {
@@ -73,7 +73,7 @@ AFRAME.registerComponent('unified-move-limited', {
     forward.y = 0;
     forward.normalize();
 
-    const right = new THREE.Vector3().crossVectors(new THREE.Vector3(0, 1, 0), forward).normalize();
+    const right = new THREE.Vector3().crossVectors(forward, new THREE.Vector3(0, 1, 0)).normalize();
 
     const move = new THREE.Vector3();
     move.copy(forward).multiplyScalar(-inputY);
